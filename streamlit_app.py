@@ -198,7 +198,7 @@ def remove_bad_steps_with_neighbours(ordered_steps):
 
     return good_steps
 def spatio_calc2(df, column):
-    basecols = ['contact_time', 'time_to_peak', 'time_between_peaks', 'loading_rate', 'loading_rate_norm', 'first_peak_grf', 'first_peak_grf_norm']
+    basecols = ['contact_time','time_to_peak','time_between_peaks','loading_rate','loading_rate_norm','first_peak_grf','first_peak_grf_norm','second_peak_grf','second_peak_grf_norm','grf_impulse','grf_impulse_norm','mean_grf','mean_grf_norm']
     grf_stats = pd.DataFrame(columns=basecols)
     contact_time = len(df[column]) / Sampling_Rate
     peaks, _ = find_peaks(df[column], distance=150/(1000/Sampling_Rate), height=0.7*weight_N)
@@ -210,10 +210,16 @@ def spatio_calc2(df, column):
         loading_rate_norm = loading_rate / weight_N if time_to_peak > 0 else np.nan
         first_peak_grf = df[column].iloc[peaks[0]]
         first_peak_grf_norm = first_peak_grf / weight_N
+        second_peak_grf = df[column].iloc[peaks[-1]]
+        second_peak_grf_norm = second_peak_grf/ weight_N
+        mean_grf = df[column].mean()
+        mean_grf_norm = mean_grf/ weight_N
+        grf_impulse = np.trapz(df[column][df[column]>0], dx= (1000/Sampling_Rate)/ 1000)
+        grf_impulse_norm = grf_impulse / weight_N
     else:
-        time_to_peak, time_between_peaks, loading_rate, loading_rate_norm, first_peak_grf, first_peak_grf_norm = [np.nan] * 6
+        time_to_peak, time_between_peaks, loading_rate, loading_rate_norm, first_peak_grf, first_peak_grf_norm , second_peak_grf, second_peak_grf_norm, mean_grf, mean_grf_norm, grf_impulse, grf_impulse_norm= [np.nan] * 13
 
-    grf_stats.loc[0] = [contact_time, time_to_peak, time_between_peaks, loading_rate, loading_rate_norm, first_peak_grf, first_peak_grf_norm]
+    grf_stats.loc[0] = [contact_time,time_to_peak,time_between_peaks,loading_rate,loading_rate_norm, first_peak_grf, first_peak_grf_norm, second_peak_grf, second_peak_grf_norm,grf_impulse,grf_impulse_norm,mean_grf,mean_grf_norm]
     return grf_stats
 def kinetic_calc2(df, column):
     clean_column = column.replace('Left','').replace('Right','')
@@ -568,7 +574,7 @@ if data_files:
     # ax1.plot(x[right_pos_peaks], right_average_series_hip[right_pos_peaks], "x",color='blue')
     # ax1.plot(x[left_neg_peaks], left_average_series_hip[left_neg_peaks], "x",color='red')
     # ax1.plot(x[right_neg_peaks], right_average_series_hip[right_neg_peaks], "x",color='blue')
-
+    
     # st.pyplot(fig1,clear_figure=True)
 else:
     st.error('Please upload the files corresponding to the trials.')

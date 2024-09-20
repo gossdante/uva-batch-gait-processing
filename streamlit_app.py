@@ -445,7 +445,7 @@ if data_files:
 
             # Convert final_summary Series to DataFrame for a single row
             final_summary_df = pd.DataFrame([final_summary])
-
+            
             # Append this file's summary to the combined DataFrame
             combined_summaries = pd.concat([combined_summaries, final_summary_df], ignore_index=True)
             combined_summaries = combined_summaries[['Trial'] + [col for col in combined_summaries.columns if col != 'Trial']]
@@ -454,9 +454,14 @@ if data_files:
 
 
         else:
-            st.write('No good steps found')
-            st.write('Ordered Steps',len(os))
-            st.write('Good Steps',len(gs))
+            st.write(f'No good steps found for {filename}. There were {len(os)} ordered steps.')
+            st.line_chart(df_processed[['LeftPlateGRF','RightPlateGRF']], color = ["#232D4B","#E57200"])
+            st.write('---')
+            trial = 'C' + filename.split('_')[-1]
+            subject = '_'.join(filename.split('_')[:-1])
+            skipped_data = pd.DataFrame({'Filename': [subject],
+                            'Trial': [trial]})
+            combined_summaries = pd.concat([combined_summaries, skipped_data], axis=0, ignore_index=True)
             continue
 
     # Once all files are processed, display the combined DataFrame

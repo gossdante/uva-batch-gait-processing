@@ -167,6 +167,7 @@ def ordered_stepfinder(dataframe):
 
 def remove_bad_steps_with_neighbours(ordered_steps):
     bad_step_indices = set()
+    bad_knee_idx = set()
 
     # Identify bad steps
     for i, (step_data, side) in enumerate(ordered_steps):
@@ -193,6 +194,27 @@ def remove_bad_steps_with_neighbours(ordered_steps):
     # Ensure the indices are within the bounds of the ordered_steps list
     extended_bad_indices = {idx for idx in extended_bad_indices if 0 <= idx <= len(ordered_steps)}
     print('Extended Bad Steps', extended_bad_indices)
+
+    # Filter out impossible knee moment data
+    for i, (step_data, side) in enumerate(ordered_steps):
+        try:
+            step_data = step_data.reset_index(drop=True)
+            if side == 'Left':
+                norm_knee_moment = step_data['LeftKneeMomentX']/normalizer # Normalize moment
+                max_norm_knee_moment = norm_knee_moment.abs().max() # Find absolute max
+                if max_norm_knee_moment > 2: # Set threshold at 2 arbitrarily, there is no logical way for knee flexion or extension moment to be 2 bodyweights
+                    bad_knee_idx.add(i)
+            else:
+                norm_knee_moment = step_data['RightKneeMomentX']/normalizer
+                max_norm_knee_moment = norm_knee_moment.abs().max()
+                if max_norm_knee_moment > 2:
+                    bad_knee_idx.add(i)
+        except Exception as e:
+            print(f"Error processing step: {e}")
+
+    # Combine both bad indices sets
+    extended_bad_indices = extended_bad_indices.union(bad_knee_idx)
+
     # Filter out bad steps including their neighbours
     good_steps = [step for i, step in enumerate(ordered_steps) if i not in extended_bad_indices]
 
@@ -581,6 +603,25 @@ if data_files:
     # ax1.plot(x[right_neg_peaks], right_average_series_hip[right_neg_peaks], "x",color='blue')
     
     # st.pyplot(fig1,clear_figure=True)
+
+    # 9.23.24
+    # Need to make a Single Normalized Plane Ankle Moment Plot for International Ankle Symposium Poster
+
+    # Combine left and right Stretched Series at the Ankle into a single variable
+    combined_stretched_series_ankle = left_stretched_series_ankle + right_stretched_series_ankle
+
+    # Create Mean Variable
+    combined_average_series_ankle = np.mean(combined_stretched_series_ankle, axis = 0)
+    
+    # Plot
+    fig4,ax4 = plt.subplots()
+    plt.title('Peak Plantarflexion Moment')
+    x = np.linspace(0,1,100)
+    ax4.plot(combined_average_series_ankle, color = '#E57200', linewidth = 2)
+    ax4.axhline(y=0,color='black')
+    plt.ylabel('Normalized Plantarflexion Moment (BW*m)')
+    st.pyplot(fig4, clear_figure = True)
+
 else:
     st.error('Please upload the files corresponding to the trials.')
 

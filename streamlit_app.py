@@ -168,6 +168,7 @@ def ordered_stepfinder(dataframe):
 def remove_bad_steps_with_neighbours(ordered_steps):
     bad_step_indices = set()
     bad_knee_idx = set()
+    bad_hip_idx = set()
 
     # Identify bad steps
     for i, (step_data, side) in enumerate(ordered_steps):
@@ -212,8 +213,26 @@ def remove_bad_steps_with_neighbours(ordered_steps):
         except Exception as e:
             print(f"Error processing step: {e}")
 
+    # Filter out impossible hip moment data
+    for i, (step_data, side) in enumerate(ordered_steps):
+        try:
+            step_data = step_data.reset_index(drop=True)
+            if side == 'Left':
+                norm_hip_moment = step_data['LeftHipMomentX']/normalizer # Normalize moment
+                max_norm_hip_moment = norm_hip_moment.abs().max() # Find absolute max
+                if max_norm_hip_moment > .5: # Set threshold at .5 arbitrarily, there is no logical way for hip flexion or extension moment to be .5 bodyweights*m
+                    bad_hip_idx.add(i)
+            else:
+                norm_hip_moment = step_data['RightHipMomentX']/normalizer
+                max_norm_hip_moment = norm_hip_moment.abs().max()
+                if max_norm_hip_moment > .5:
+                    bad_hip_idx.add(i)
+        except Exception as e:
+            print(f"Error processing step: {e}")
+
     # Combine both bad indices sets
     extended_bad_indices = extended_bad_indices.union(bad_knee_idx)
+    extended_bad_indices = extended_bad_indices.union(bad_hip_idx)
 
     # Filter out bad steps including their neighbours
     good_steps = [step for i, step in enumerate(ordered_steps) if i not in extended_bad_indices]
@@ -244,6 +263,8 @@ def spatio_calc2(df, column):
     grf_stats.loc[0] = [contact_time,time_to_peak,time_between_peaks,loading_rate,loading_rate_norm, first_peak_grf, first_peak_grf_norm, second_peak_grf, second_peak_grf_norm,grf_impulse,grf_impulse_norm,mean_grf,mean_grf_norm]
     return grf_stats
 def kinetic_calc2(df, column):
+    # Note that the flexion moment for knee and ankle occurs in the second half while it occurs in the first half for hip.
+
     clean_column = column.replace('Left','').replace('Right','')
     basecols = ['pos_peak', 'neg_peak', 'pos_peak_norm', 'neg_peak_norm', 'mean', 'mean_norm', 'positive_impulse', 'negative_impulse', 'positive_impulse_norm', 'negative_impulse_norm']
     newcols = [clean_column + '_' + item for item in basecols]
@@ -252,26 +273,49 @@ def kinetic_calc2(df, column):
     # Initialize variables to ensure they have values even if try block fails
     pos_peak = neg_peak = pos_peak_norm = neg_peak_norm = np.nan
 
-    try:
-        # Find the positive peak in the second half of the waveform
-        l = len(df[column])
-        first_half = df[column][:round(l/2)]
-        second_half = df[column][round(l/2):]
+    # Logic to decide if Hip or Not
+    if 'Hip' in column:
+        try:
+            # Find the positive peak in the first half of the waveform
+            l = len(df[column])
+            first_half = df[column][:round(l/2)]
+            second_half = df[column][round(l/2):]
 
-        pos_peaks, _ = find_peaks(second_half)#, distance=len(second_half)-1
-        if pos_peaks.size > 0:
-            #pos_peak = df[column].iloc[pos_peaks+round(len(second_half))].max()
-            pos_peak = second_half.iloc[pos_peaks].max()
-            pos_peak_norm = pos_peak / weight_N
+            pos_peaks, _ = find_peaks(first_half)#, distance=len(second_half)-1
+            if pos_peaks.size > 0:
+                #pos_peak = df[column].iloc[pos_peaks+round(len(second_half))].max()
+                pos_peak = first_half.iloc[pos_peaks].max()
+                pos_peak_norm = pos_peak / weight_N
 
-        # Find the negative peak in the first half of the waveform
-        
-        neg_peaks, _ = find_peaks(-1 * first_half)
-        if neg_peaks.size > 0:
-            neg_peak = first_half.iloc[neg_peaks].min()
-            neg_peak_norm = neg_peak / weight_N
-    except Exception as e:
-        print(f"Error in kinetic calculation: {e}")
+            # Find the negative peak in the second half of the waveform
+            
+            neg_peaks, _ = find_peaks(-1 * second_half)
+            if neg_peaks.size > 0:
+                neg_peak = second_half.iloc[neg_peaks].min()
+                neg_peak_norm = neg_peak / weight_N
+        except Exception as e:
+            print(f"Error in kinetic calculation: {e}")
+    else:
+        try:
+            # Find the positive peak in the second half of the waveform
+            l = len(df[column])
+            first_half = df[column][:round(l/2)]
+            second_half = df[column][round(l/2):]
+
+            pos_peaks, _ = find_peaks(second_half)#, distance=len(second_half)-1
+            if pos_peaks.size > 0:
+                #pos_peak = df[column].iloc[pos_peaks+round(len(second_half))].max()
+                pos_peak = second_half.iloc[pos_peaks].max()
+                pos_peak_norm = pos_peak / weight_N
+
+            # Find the negative peak in the first half of the waveform
+            
+            neg_peaks, _ = find_peaks(-1 * first_half)
+            if neg_peaks.size > 0:
+                neg_peak = first_half.iloc[neg_peaks].min()
+                neg_peak_norm = neg_peak / weight_N
+        except Exception as e:
+            print(f"Error in kinetic calculation: {e}")
 
     mean = df[column].mean()
     mean_norm = mean / weight_N
@@ -282,6 +326,7 @@ def kinetic_calc2(df, column):
 
     kinetic_stats.loc[0] = [pos_peak, neg_peak, pos_peak_norm, neg_peak_norm, mean, mean_norm, positive_impulse, negative_impulse, positive_impulse_norm, negative_impulse_norm]
     return kinetic_stats
+
 def kinematic_calc2(df, column):
     """
     Calculate max and min for kinematic variables.
@@ -333,7 +378,7 @@ def new_step_summarizer(ordered_steps):
         # Combine all data for the current step
         step_summary = pd.concat([spatio_step, kinetic_step, kinematic_step], axis=1)
         step_summary['Limb'] = side
-
+        
         # Append to the overall data
         all_steps = pd.concat([all_steps, step_summary])
 
@@ -406,7 +451,7 @@ if data_files:
         
         if len(gs)>0:
 
-
+            st.write('There were ',len(gs),' valid steps from ',len(os),'recorded')
             if 'RightKneeRotation' in gs[0][0].columns:
                 left_kinetic_vars = ['LeftKneeMomentZ','LeftKneeMomentY','LeftKneeMomentX', 'LeftKneeForceZ','LeftKneeForceY','LeftKneeForceX','LeftHipMomentZ','LeftHipMomentY','LeftHipMomentX',  'LeftHipForceZ','LeftHipForceY','LeftHipForceX', 'LeftAnkleMomentZ','LeftAnkleMomentY','LeftAnkleMomentX',   'LeftAnkleForceZ','LeftAnkleForceY','LeftAnkleForceX']
                 right_kinetic_vars = ['RightKneeMomentZ','RightKneeMomentY','RightKneeMomentX', 'RightKneeForceZ','RightKneeForceY','RightKneeForceX','RightHipMomentZ','RightHipMomentY','RightHipMomentX','RightHipForceZ','RightHipForceY','RightHipForceX', 'RightAnkleMomentZ','RightAnkleMomentY','RightAnkleMomentX','RightAnkleForceZ','RightAnkleForceY','RightAnkleForceX']
@@ -419,7 +464,7 @@ if data_files:
                 right_kinematic_vars = ['RightKneeFlexion','RightHipFlexion','RightHipAbduction','RightAnkleFlexion']
             # Generate variables
             all_steps = new_step_summarizer(gs)
-
+            
             limb_steps = all_steps.groupby(['Limb']).agg('mean').reset_index()
             # April 30 Test
             # Need to add a display of limb aggregate data to examine asymmetry
@@ -583,27 +628,28 @@ if data_files:
     ax2.axhline(y=0,color='black')
     st.pyplot(fig2, clear_figure=True)
 
-    # st.write('---')
-    # fig1,ax1 = plt.subplots()
-    # #plt.title('Normalized Sagittal Plane Hip Moment')
-    # x = np.linspace(0,1,100)
-    # ax1.plot(x,left_average_series_hip, label='Left Hip',color='red',linewidth=1)
-    # ax1.plot(x, right_average_series_hip,label='Right Hip',color='blue',linewidth=1)
-    # ax1.legend()
+    st.write('---')
+    fig1,ax1 = plt.subplots()
+    plt.title('Normalized Sagittal Plane Hip Moment')
+    x = np.linspace(0,1,100)
+    ax1.plot(x,left_average_series_hip, label='Left Hip',color='red',linewidth=1)
+    ax1.plot(x, right_average_series_hip,label='Right Hip',color='blue',linewidth=1)
+    ax1.legend()
 
-    # left_pos_peaks, _ = find_peaks(left_average_series_hip, distance=99)
-    # right_pos_peaks, _ = find_peaks(right_average_series_hip,distance=99)
+    left_pos_peaks, _ = find_peaks(left_average_series_hip, distance=99)
+    right_pos_peaks, _ = find_peaks(right_average_series_hip,distance=99)
 
-    # left_neg_peaks, _ = find_peaks(-left_average_series_hip, distance=99)
-    # right_neg_peaks, _ = find_peaks(-right_average_series_hip, distance=99)
+    left_neg_peaks, _ = find_peaks(-left_average_series_hip, distance=99)
+    right_neg_peaks, _ = find_peaks(-right_average_series_hip, distance=99)
 
-    # ax1.plot(x[left_pos_peaks], left_average_series_hip[left_pos_peaks], "x",color='red')
-    # ax1.plot(x[right_pos_peaks], right_average_series_hip[right_pos_peaks], "x",color='blue')
-    # ax1.plot(x[left_neg_peaks], left_average_series_hip[left_neg_peaks], "x",color='red')
-    # ax1.plot(x[right_neg_peaks], right_average_series_hip[right_neg_peaks], "x",color='blue')
+    ax1.plot(x[left_pos_peaks], left_average_series_hip[left_pos_peaks], "x",color='red')
+    ax1.plot(x[right_pos_peaks], right_average_series_hip[right_pos_peaks], "x",color='blue')
+    ax1.plot(x[left_neg_peaks], left_average_series_hip[left_neg_peaks], "x",color='red')
+    ax1.plot(x[right_neg_peaks], right_average_series_hip[right_neg_peaks], "x",color='blue')
     
-    # st.pyplot(fig1,clear_figure=True)
-
+    ax1.axhline(y=0, color = 'black')
+    st.pyplot(fig1,clear_figure=True)
+    st.write('---')
     # 9.23.24
     # Need to make a Single Normalized Plane Ankle Moment Plot for International Ankle Symposium Poster
 

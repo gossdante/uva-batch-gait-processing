@@ -468,8 +468,17 @@ if data_files:
             limb_steps = all_steps.groupby(['Limb']).agg('mean').reset_index()
             # April 30 Test
             # Need to add a display of limb aggregate data to examine asymmetry
-        
-            trial = 'C' + filename.split('_')[-1]  # Extract trial from the filename
+            
+            # 11/28/25 adding flow so if the filename has B or P then it includes a separate column for timepoint
+            print(filename)
+            if filename.endswith(('B', 'P')):
+                trial = 'C' + filename.split('_')[-2]  # Extract trial from the filename
+                timepoint = filename.split('_')[-1]  # Extract timepoint
+            else:
+                trial = 'C' + filename.split('_')[-1]  # Extract trial from the filename
+                timepoint = 'B'
+
+            # trial = 'C' + filename.split('_')[-1]  # Extract trial from the filename
             limb_copy = limb_steps.copy()
             limb_names['Trial'] = trial
             limb_names['Filename'] = '_'.join(filename.split('_')[:-1])  # Correct filename to be the subject identifier
@@ -506,8 +515,9 @@ if data_files:
             final_summary = nolimb.mean()
             
             # Correct the 'Filename' assignment
-            trial = 'C' + filename.split('_')[-1]  # Extract trial from the filename
+            # trial = 'C' + filename.split('_')[-1]  # Extract trial from the filename
             final_summary['Trial'] = trial
+            final_summary['Timepoint'] = timepoint
             final_summary['Filename'] = '_'.join(filename.split('_')[:-1])  # Correct filename to be the subject identifier
 
             # Convert final_summary Series to DataFrame for a single row

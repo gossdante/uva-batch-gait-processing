@@ -255,7 +255,7 @@ def spatio_calc2(df, column):
         second_peak_grf_norm = second_peak_grf/ weight_N
         mean_grf = df[column].mean()
         mean_grf_norm = mean_grf/ weight_N
-        grf_impulse = np.trapz(df[column][df[column]>0], dx= (1000/Sampling_Rate)/ 1000)
+        grf_impulse = np.trapezoid(df[column][df[column]>0], dx= (1000/Sampling_Rate)/ 1000)
         grf_impulse_norm = grf_impulse / weight_N
     else:
         time_to_peak, time_between_peaks, loading_rate, loading_rate_norm, first_peak_grf, first_peak_grf_norm , second_peak_grf, second_peak_grf_norm, mean_grf, mean_grf_norm, grf_impulse, grf_impulse_norm= [np.nan] * 13
@@ -319,8 +319,8 @@ def kinetic_calc2(df, column):
 
     mean = df[column].mean()
     mean_norm = mean / weight_N
-    positive_impulse = np.trapz(df[column][df[column] > 0], dx=(1000/Sampling_Rate)/1000)
-    negative_impulse = np.trapz(df[column][df[column] < 0], dx=(1000/Sampling_Rate)/1000)
+    positive_impulse = np.trapezoid(df[column][df[column] > 0], dx=(1000/Sampling_Rate)/1000)
+    negative_impulse = np.trapezoid(df[column][df[column] < 0], dx=(1000/Sampling_Rate)/1000)
     positive_impulse_norm = positive_impulse / weight_N
     negative_impulse_norm = negative_impulse / weight_N
 
